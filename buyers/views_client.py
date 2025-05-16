@@ -1,5 +1,5 @@
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView, ListCreateAPIView
+from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView, ListCreateAPIView, RetrieveAPIView
 from .serializers import UserSerializer, ClientBusinessSerializer, ClientCatalogeSerializer, ClientAddressSerializer
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from .models import User, ClientCataloge, ClientAddress, ClientBusiness
@@ -7,12 +7,27 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from .permissions import IsAdminOrManager, IsAdmin, IsBuyerOnly
+from orders.models import Cart
 
 
 class ListClientView(ListAPIView):
     queryset = User.objects.filter(is_staff=False)
     serializer_class = UserSerializer
     permission_classes = [IsAdminOrManager]
+
+
+class ClientProfileView(APIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = self.request.user
+        profile = User.objects.get(id=user.id)
+        cartItems = Cart.objects.filter(user=user)
+        serializer = self.serializer_class(profile)
+        data = serializer.data
+        data['cartItems'] = len(cartItems)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ManageClientView(RetrieveUpdateDestroyAPIView):
@@ -72,18 +87,18 @@ class ClientBusinessView(APIView):
             emp_details, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        user = request.user
-        serializer = self.serializer_class(
-            data=request.data, context={'request': request})
+    # def post(self, request):
+    #     user = request.user
+    #     serializer = self.serializer_class(
+    #         data=request.data, context={'request': request})
 
-        if (ClientBusiness.objects.filter(user=user).exists()):
-            return Response({"detail": "user details already exist"}, status=status.HTTP_409_CONFLICT)
+    #     if (ClientBusiness.objects.filter(user=user).exists()):
+    #         return Response({"detail": "user details already exist"}, status=status.HTTP_409_CONFLICT)
 
-        if serializer.is_valid():
-            serializer.save(user=user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #     if serializer.is_valid():
+    #         serializer.save(user=user)
+    #         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
         user = request.user
@@ -99,14 +114,14 @@ class ClientBusinessView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request):
-        user = request.user
-        try:
-            emp_details = ClientBusiness.objects.get(user=user)
-            emp_details.delete()
-            return Response({"detail": "user details deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-        except ClientBusiness.DoesNotExist:
-            raise NotFound(detail="user not found")
+    # def delete(self, request):
+    #     user = request.user
+    #     try:
+    #         emp_details = ClientBusiness.objects.get(user=user)
+    #         emp_details.delete()
+    #         return Response({"detail": "user details deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    #     except ClientBusiness.DoesNotExist:
+    #         raise NotFound(detail="user not found")
 
 
 class ClientCatalogeView(APIView):
@@ -124,18 +139,18 @@ class ClientCatalogeView(APIView):
             emp_details, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        user = request.user
-        serializer = self.serializer_class(
-            data=request.data, context={'request': request})
+    # def post(self, request):
+    #     user = request.user
+    #     serializer = self.serializer_class(
+    #         data=request.data, context={'request': request})
 
-        if (ClientBusiness.objects.filter(user=user).exists()):
-            return Response({"detail": "user details already exist"}, status=status.HTTP_409_CONFLICT)
+    #     if (ClientBusiness.objects.filter(user=user).exists()):
+    #         return Response({"detail": "user details already exist"}, status=status.HTTP_409_CONFLICT)
 
-        if serializer.is_valid():
-            serializer.save(user=user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #     if serializer.is_valid():
+    #         serializer.save(user=user)
+    #         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
         user = request.user
@@ -151,14 +166,14 @@ class ClientCatalogeView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request):
-        user = request.user
-        try:
-            emp_details = ClientBusiness.objects.get(user=user)
-            emp_details.delete()
-            return Response({"detail": "user details deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-        except ClientBusiness.DoesNotExist:
-            raise NotFound(detail="user not found")
+    # def delete(self, request):
+    #     user = request.user
+    #     try:
+    #         emp_details = ClientBusiness.objects.get(user=user)
+    #         emp_details.delete()
+    #         return Response({"detail": "user details deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    #     except ClientBusiness.DoesNotExist:
+    #         raise NotFound(detail="user not found")
 
 
 class ClientAddressView(APIView):

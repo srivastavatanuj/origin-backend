@@ -45,9 +45,10 @@ class Product(models.Model):
 
 class ProductVariant(models.Model):
     product = models.ForeignKey(
-        Product, related_name='size', on_delete=models.CASCADE)
-    size = models.DecimalField(max_digits=6, decimal_places=2)
-    size_unit = models.CharField(max_length=20)
+        Product, related_name='product_variant', on_delete=models.CASCADE)
+    size = models.CharField(max_length=10)
+    weight = models.DecimalField(max_digits=6, decimal_places=2)
+    weight_unit = models.CharField(max_length=20)
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
     packer_length = models.FloatField()
@@ -55,6 +56,9 @@ class ProductVariant(models.Model):
     packer_height = models.FloatField()
     stock_inventory = models.PositiveIntegerField()
     expiry = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.product}-{self.size}"
 
 
 class ProductImage(models.Model):
@@ -73,6 +77,8 @@ class ProductCatalog(models.Model):
     )
     product = models.ForeignKey(
         'Product', on_delete=models.SET_NULL, null=True)
+    product_variant = models.ForeignKey(
+        ProductVariant, on_delete=models.DO_NOTHING)
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):

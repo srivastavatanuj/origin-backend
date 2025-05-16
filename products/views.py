@@ -1,19 +1,32 @@
-from rest_framework import generics
-from rest_framework.permissions import IsAdminUser
+from gettext import Catalog
+from rest_framework import generics, views
+from rest_framework.permissions import IsAdminUser, AllowAny, IsAuthenticated
 from .models import Brand, Category, Product, ProductVariant, ProductImage, ProductCatalog
 from .serializers import (
     BrandSerializer, CategorySerializer, ProductSerializer,
-    ProductVariantSerializer, ProductImageSerializer, ProductCatalogeSerializer
+    ProductVariantSerializer, ProductImageSerializer, ProductCatalogeSerializer, ViewProductSerializer, MyCatalogeProductVarientSerializer, MyCatalogeProductSerializer, MyCatalogeSerializer
 )
 from buyers.permissions import IsAdminOrManager
 from faker import Faker
 import random
+from django.shortcuts import get_object_or_404
 
 from django.core.files.base import ContentFile
 from django.core.files.images import ImageFile
 import random
 import io
 from PIL import Image
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
+
+# paginatoion
+
+
+class CustomPagination(PageNumberPagination):
+    page_size = 8
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 # BRAND
 
@@ -52,12 +65,20 @@ class ListProductView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrManager]
+    pagination_class = CustomPagination
 
 
 class ManageProductView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrManager]
+
+
+class ViewAllProductView(generics.ListAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ViewProductSerializer
+    permission_classes = [AllowAny]
+
 
 # VARIANT
 
@@ -103,6 +124,54 @@ class ManageProductCatalogeView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductCatalogeSerializer
     lookup_field = 'id'
     permission_classes = [IsAdminOrManager]
+
+
+class MyCatalogeView(generics.ListAPIView):
+    serializer_class = MyCatalogeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return ProductCatalog.objects.filter(catalog__user=user)
+
+
+class MyCatalogeProductView(views.APIView):
+    serializer_class = ViewProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        user = request.user
+        catalog_entries = ProductCatalog.objects.filter(
+            catalog__user=user, product__pk=pk)
+
+        product = get_object_or_404(Product, pk=pk)
+
+        variant_ids = catalog_entries.values_list('product_variant', flat=True)
+        product_ids = catalog_entries.values_list('product', flat=True)
+        variants = ProductVariant.objects.filter(id__in=variant_ids)
+
+        product_data = ProductSerializer(
+            product, context={'request': request}).data
+        variant_data = ProductVariantSerializer(variants, many=True).data
+
+        if pk in product_ids:
+            return Response({
+                "product": product_data,
+                "variants": variant_data
+            })
+        else:
+            return Response(
+                {"error": "Product not found in the user's catalog."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class MyCatalogeProductVarientView(generics.RetrieveAPIView):
+    serializer_class = MyCatalogeProductVarientSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return super().get_queryset()
 
 
 def fake_brand():

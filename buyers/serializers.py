@@ -48,10 +48,12 @@ class StaffProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = User
         fields = ('id', 'full_name', 'nick_name', 'phone', 'email')
         read_only_fields = ('email',)
+
 
 # ClientBusinessSerializer,ClientCatalogeSerializer,ClientAddressSerializer
 

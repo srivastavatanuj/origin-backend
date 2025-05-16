@@ -1,3 +1,215 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
-# Create your views here.
+from rest_framework import generics, status, views
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from yaml import serialize
+
+from .models import Cart, Order, OrderItem, Payment, Shipping
+from products.models import ProductCatalog
+from buyers.models import ClientAddress
+from .serializers import (
+    CartSerializer, OrderSerializer, OrderDetailSerializer,
+    OrderPlaceSerializer, CartListSerializer
+)
+from django.db.models import Sum
+import pdb
+from rest_framework.exceptions import NotFound
+import uuid
+import requests
+
+
+class CartView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CartListSerializer
+
+    def get(self, request):
+        user = self.request.user
+        cart = Cart.objects.filter(user=user)
+        price = Cart.objects.filter(user=user).aggregate(Sum('price'))
+
+        serializer = self.serializer_class(
+            cart, many=True, context={'request': request}).data
+        # product_name=
+        # product_image =
+        # variant_size =
+        data = {'cart_items': serializer, 'total_price': price}
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        user = self.request.user
+        cart = Cart.objects.filter(user=user)
+        catalog = ProductCatalog.objects.filter(catalog__user=user)
+        variantIds = catalog.values_list('product_variant', flat=True)
+
+        currectVar = request.data['productVariant']
+
+        if currectVar not in variantIds:
+            raise NotFound(
+                detail='Selected variant does not belong to the selected product')
+        # pdb.set_trace()
+        try:
+            cart = Cart.objects.get(
+                user=user, productVariant=currectVar)
+            cart.price += request.data['quantity'] * \
+                catalog.get(product_variant=currectVar).price
+            cart.quantity += request.data['quantity']
+        except:
+            price = request.data['quantity'] * \
+                catalog.get(product_variant=currectVar).price
+            cart = Cart.objects.create(
+                user=user, productVariant_id=currectVar, price=price, quantity=request.data['quantity'])
+
+        cart.save()
+        return Response({'details': "Item added Successfully"}, status=status.HTTP_201_CREATED)
+
+    def put(self, request):
+        user = self.request.user
+        currectVar = request.data['productVariant']
+        cart = get_object_or_404(Cart, productVariant_id=currectVar)
+        cart.quantity = request.data['quantity']
+        cart.save()
+        return Response({'details': "Item updated Successfully"}, status=status.HTTP_200_OK)
+
+    def delete(self, request):
+        user = self.request.user
+        currectVar = request.data['productVariant']
+        cart = get_object_or_404(Cart, productVariant_id=currectVar)
+        cart.delete()
+        return Response({'details': "Item deleted Successfully"}, status=status.HTTP_200_OK)
+
+
+class OrderListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user)
+
+
+class OrderDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderDetailSerializer
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user)
+
+
+class CreatePaymentLinkView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderPlaceSerializer
+
+    def post(self, request):
+        user = request.user
+        cart = Cart.objects.filter(user=user)
+
+        if not cart.exists():
+            return Response({'details': "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+
+        total_price = cart.aggregate(total=Sum('price'))['total']
+        order = Order.objects.create(user=user, total_amount=total_price)
+
+        try:
+            for item in cart:
+                OrderItem.objects.create(
+                    order=order,
+                    variant=item.productVariant,
+                    quantity=item.quantity,
+                    price=item.price
+                )
+        except Exception as e:
+            order.delete()
+            return Response({'details': 'Order creation failed', 'error': str(e)},
+                            status=status.HTTP_409_CONFLICT)
+
+        # 🎯 Create Square Payment Link
+        url = "https://connect.squareupsandbox.com/v2/online-checkout/payment-links"
+        headers = {
+            "Square-Version": "2025-04-16",
+            # test
+            "Authorization": "Bearer EAAAl5tUivtk4spFaOmaf_s07xaVRd27hBbMKZ2Je3K9ymfEIzx1ovmVwgwu6psH",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "idempotency_key": str(uuid.uuid4()),
+            "checkout_options": {
+                "redirect_url": "http://localhost:5173/",
+            },
+            "order": {
+                "location_id": "LMX2N2PEESXYM",  # replace with your actual location ID
+                "line_items": [
+                    {
+                        "name": f"{item.productVariant}",
+                        "quantity": str(item.quantity),
+                        "base_price_money": {
+                            # Square uses cents
+                            "amount": int(item.price * 100),
+                            "currency": "CAD"
+                        }
+                    }
+                    for item in cart
+                ]
+            }
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            payment_data = response.json()
+            payment_url = payment_data['payment_link']['url']
+            return Response({
+                'details': 'Order created successfully',
+                'payment_url': payment_url
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                'details': 'Order created but failed to generate payment link',
+                'square_response': response.json()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class OrderPlaceView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderPlaceSerializer
+
+    def post(self, request):
+        user = self.request.user
+        cart = Cart.objects.filter(user=user)
+
+        if len(cart) == 0:
+            return Response({'details': "cart is empty"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        total_price = cart.aggregate(total=Sum('price'))['total']
+
+        order = Order.objects.create(user=user, total_amount=total_price)
+        order.save()
+
+        try:
+            for item in cart:
+                OrderItem.objects.create(
+                    order=order,
+                    variant=item.productVariant,
+                    quantity=item.quantity,
+                    price=item.price
+                )
+
+        except:
+            return Response({'details': 'Something went wrong!'}, status=status.HTTP_409_CONFLICT)
+
+        cart.delete()
+        # payment
+        payment = Payment.objects.create(order=order, payment_method='Demo')
+
+        if payment.transaction_status == 'paid':
+            address = get_object_or_404(ClientAddress, user=user)
+            Shipping.objects.create(order=order, address=address)
+        return Response({'details': 'Order created successfully'}, status=status.HTTP_201_CREATED)
+
+
+class OrderManageView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user)

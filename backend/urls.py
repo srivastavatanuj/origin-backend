@@ -39,6 +39,8 @@ urlpatterns = [
     path('client/', include('buyers.urls_client')),
     path('staff/', include('buyers.urls_staff')),
     path('products/', include('products.urls')),
+    path('orders/', include('orders.urls')),
+    path('query/', include('query.urls')),
     # path('client/', include('buyers.urls_client'))
 
     # Swagger/OpenAPI endpoints
@@ -54,3 +56,5 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL,
                           document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL,
+                          document_root=settings.MEDIA_ROOT)

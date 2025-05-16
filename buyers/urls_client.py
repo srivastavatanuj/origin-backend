@@ -24,6 +24,7 @@ urlpatterns = [
     # user
     path('business/', ClientBusinessView.as_view(), name='client-business'),
     path('cataloge/', ClientCatalogeView.as_view(), name='client-cataloge'),
-    path('address/', ClientAddressView.as_view(), name='client-address')
+    path('address/', ClientAddressView.as_view(), name='client-address'),
+    path('profile/', ClientProfileView.as_view(), name='client-profile'),
 
 ]
