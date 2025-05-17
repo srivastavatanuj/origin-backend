@@ -18,6 +18,10 @@ from rest_framework.exceptions import NotFound
 import uuid
 import requests
 
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
+
 
 class CartView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -126,15 +130,13 @@ class CreatePaymentLinkView(views.APIView):
         # 🎯 Create Square Payment Link
         url = "https://connect.squareupsandbox.com/v2/online-checkout/payment-links"
         headers = {
-            "Square-Version": "2025-04-16",
-            # test
             "Authorization": "Bearer EAAAl5tUivtk4spFaOmaf_s07xaVRd27hBbMKZ2Je3K9ymfEIzx1ovmVwgwu6psH",
             "Content-Type": "application/json"
         }
         payload = {
             "idempotency_key": str(uuid.uuid4()),
             "checkout_options": {
-                "redirect_url": "http://localhost:5173/",
+                "redirect_url": "http://localhost:5173/orders/place",
             },
             "order": {
                 "location_id": "LMX2N2PEESXYM",  # replace with your actual location ID
@@ -144,7 +146,7 @@ class CreatePaymentLinkView(views.APIView):
                         "quantity": str(item.quantity),
                         "base_price_money": {
                             # Square uses cents
-                            "amount": int(item.price * 100),
+                            "amount": int(item.price/item.quantity * 100),
                             "currency": "CAD"
                         }
                     }
@@ -157,15 +159,34 @@ class CreatePaymentLinkView(views.APIView):
         if response.status_code == 200:
             payment_data = response.json()
             payment_url = payment_data['payment_link']['url']
+            order_id = payment_data['orders']['id']
             return Response({
                 'details': 'Order created successfully',
-                'payment_url': payment_url
+                'payment_url': payment_url,
             }, status=status.HTTP_201_CREATED)
         else:
             return Response({
                 'details': 'Order created but failed to generate payment link',
                 'square_response': response.json()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+def square_webhook(request):
+    payload = json.loads(request.body)
+    event_type = payload.get("type")
+
+    if event_type == "payment.updated":
+        payment = payload["data"]["object"]["payment"]
+        status = payment["status"]
+        payment_id = payment["id"]
+
+        if status == "COMPLETED":
+            # Find your order using metadata or tracking ID, mark it as paid
+            pass
+
+    return Response({"status": "ok"})
+    # return Response({'details': 'success'}, status=status.HTTP_200_OK)
 
 
 class OrderPlaceView(views.APIView):

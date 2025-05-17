@@ -27,12 +27,13 @@ SECRET_KEY = 'django-insecure-@$x8h!4q74fem8h+m#97hh08p!p)3an)h3$+%b=quf#gj44@56
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -79,9 +80,20 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME_LATE_USER': timedelta(days=30),
 }
 
+JAZZMIN_SETTINGS = {
+    "site_title": "Origins Admin",
+    "site_header": "Origins",
+    "site_brand": "Origins",
+    "welcome_sign": "Staff Login",
+    "login_logo": None,
+    "site_logo": None,
+    "login_logo_dark": None,
+}
+
 ROOT_URLCONF = 'backend.urls'
 
 AUTH_USER_MODEL = 'buyers.User'
+ADMIN_SITE_HEADER = "Origins"
 
 TEMPLATES = [
     {
@@ -147,8 +159,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -157,4 +170,3 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-LOGIN_URL = '/auth/login/'

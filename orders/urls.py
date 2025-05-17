@@ -4,7 +4,7 @@ from .views import *
 
 from .views import (
     CartView,
-    OrderListView, OrderDetailView, OrderPlaceView, OrderManageView, CreatePaymentLinkView
+    OrderListView, OrderDetailView, OrderPlaceView, OrderManageView, CreatePaymentLinkView, square_webhook
 )
 
 urlpatterns = [
@@ -16,4 +16,5 @@ urlpatterns = [
     path('create-payment-link/', CreatePaymentLinkView.as_view(), name='order-link'),
     path('place/', OrderPlaceView.as_view(), name='order-place'),
     path('place/<int:id>/', OrderManageView.as_view(), name='order-manage'),
+    path("square/webhook/", square_webhook),
 ]
