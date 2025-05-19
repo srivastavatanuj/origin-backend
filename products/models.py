@@ -81,5 +81,5 @@ class ProductCatalog(models.Model):
         ProductVariant, on_delete=models.DO_NOTHING)
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
-    def __str__(self):
-        return f"{self.catalog} - {self.product} - {self.price}"
+    def _str_(self):
+        return f"{self.name} [{self.product.id}]"

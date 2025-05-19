@@ -1,7 +1,7 @@
 from django.db import models
 from buyers.models import User, ClientAddress
 from products.models import ProductVariant
-
+import uuid
 # Create your models here.
 
 
@@ -21,7 +21,7 @@ class Order(models.Model):
         ('failed', 'Failed'),
         ('cancelled', 'Cancelled'),
     )
-
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='order')
     created_at = models.DateTimeField(auto_now_add=True)
