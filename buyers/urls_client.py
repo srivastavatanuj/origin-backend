@@ -25,6 +25,6 @@ urlpatterns = [
     path('business/', ClientBusinessView.as_view(), name='client-business'),
     path('cataloge/', ClientCatalogeView.as_view(), name='client-cataloge'),
     path('address/', ClientAddressView.as_view(), name='client-address'),
-    path('profile/', ClientProfileView.as_view(), name='client-profile'),
-
+    path('user/', ClientUserView.as_view(), name='client-user'),
+     path('profile/', ClientProfileView.as_view(), name='client-profile'),
 ]

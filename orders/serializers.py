@@ -2,6 +2,7 @@ from gettext import Catalog
 from rest_framework import serializers
 from .models import Cart, Order, OrderItem, Shipping, Payment
 from products.models import ProductCatalog, ProductImage
+from buyers.models import ClientAddress
 from products.serializers import ProductVariantSerializer, ProductImageSerializer
 
 
@@ -49,33 +50,65 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(
+        source='variant.product.name', read_only=True)
+    product_image = serializers.CharField(
+        source='variant.product.image', read_only=True)
+    variant_size = serializers.CharField(
+        source='variant.size', read_only=True)
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        # import pdb
+        # pdb.set_trace()
+        image = ProductImage.objects.filter(
+            product=obj.variant.product)[0]
+        return ProductImageSerializer(image,  context={
+            'request': self.context['request']}).data['image']
+
     class Meta:
         model = OrderItem
         fields = '__all__'
 
 
 class OrderSerializer(serializers.ModelSerializer):
+    name_field = serializers.SerializerMethodField()
+
     class Meta:
         model = Order
         exclude = ('user',)
+
+    def get_name_field(self, obj):
+
+        items = OrderItem.objects.filter(order=obj).values_list(
+            'variant__product__name', flat=True)
+        item_names = list(items)
+
+        if len(item_names) > 2:
+            truncated_names = item_names[:2]
+            truncated_names.append("...")
+            return ", ".join(truncated_names)
+        else:
+            return ", ".join(item_names)
 
 
 class OrderShippingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shipping
-        exclude = ('user',)
+        fields = '__all__'
 
 
 class OrderPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
-        exclude = ('user',)
+        fields = '__all__'
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
     order_items = serializers.SerializerMethodField()
-    # shipping_details = serializers.SerializerMethodField()
-    # paymant_details = serializers.SerializerMethodField()
+    shipping_details = serializers.SerializerMethodField()
+    # shipping_address = serializers.SerializerMethodField()
+    payment_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -83,18 +116,25 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
     def get_order_items(self, obj):
         items = OrderItem.objects.filter(order=obj)
-        serializer_items = OrderItemSerializer(items, many=True).data
+        serializer_items = OrderItemSerializer(
+            items, many=True, context=self.context).data
         return serializer_items
 
-    # def get_shipping_details(self, obj):
+    def get_shipping_details(self, obj):
+        shipping = Shipping.objects.filter(order=obj)
+        serializer_items = OrderShippingSerializer(shipping, many=True).data
+        return serializer_items
+
+    # def get_shipping_address(self, obj):
     #     shipping = Shipping.objects.filter(order=obj)
     #     serializer_items = OrderShippingSerializer(shipping, many=True).data
     #     return serializer_items
 
-    # def get_paymant_details(self, obj):
-    #     payment = OrderItem.objects.filter(order=obj)
-    #     serializer_items = OrderItemSerializer(items, many=True).data
-    #     return serializer_items
+    def get_payment_details(self, obj):
+        payment = Payment.objects.filter(order=obj)
+        serializer_items = OrderPaymentSerializer(
+            payment, many=True, context={'request': self.context.get('request')}).data
+        return serializer_items
 
 
 class OrderPlaceSerializer(serializers.ModelSerializer):

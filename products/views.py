@@ -154,6 +154,15 @@ class MyCatalogeProductView(views.APIView):
             product, context={'request': request}).data
         variant_data = ProductVariantSerializer(variants, many=True).data
 
+        catalog_entries_map = {
+            entry.product_variant.id: entry.price for entry in catalog_entries}
+
+        if catalog_entries[0].catalog.pricing_enabled:
+            for variant in variant_data:
+                var_id = variant['id']
+                if var_id in catalog_entries_map:
+                    variant['price'] = str(catalog_entries_map[var_id])
+
         if pk in product_ids:
             return Response({
                 "product": product_data,

@@ -6,8 +6,6 @@ from buyers.models import ClientCataloge
 class Category(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    logo = models.ImageField(
-        upload_to='products/images/categories/', blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -42,6 +40,9 @@ class Product(models.Model):
     def __str__(self):
         return f"{self.name} ({self.sku})"
 
+    def get_categories(self):
+        return ", ".join([category.name for category in self.category.all()])
+
 
 class ProductVariant(models.Model):
     product = models.ForeignKey(
@@ -51,9 +52,9 @@ class ProductVariant(models.Model):
     weight_unit = models.CharField(max_length=20)
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
-    packer_length = models.FloatField()
-    packer_width = models.FloatField()
-    packer_height = models.FloatField()
+    packer_length = models.FloatField(blank=True, null=True)
+    packer_width = models.FloatField(blank=True, null=True)
+    packer_height = models.FloatField(blank=True, null=True)
     stock_inventory = models.PositiveIntegerField()
     expiry = models.DateField(blank=True, null=True)
 

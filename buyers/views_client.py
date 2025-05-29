@@ -16,7 +16,7 @@ class ListClientView(ListAPIView):
     permission_classes = [IsAdminOrManager]
 
 
-class ClientProfileView(APIView):
+class ClientUserView(APIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
@@ -28,6 +28,33 @@ class ClientProfileView(APIView):
         data = serializer.data
         data['cartItems'] = len(cartItems)
         return Response(data, status=status.HTTP_200_OK)
+
+
+class ClientProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        user_serializer = UserSerializer(user)
+
+        client_address = ClientAddress.objects.get(user=user)
+        client_address_serializer = ClientAddressSerializer(client_address)
+
+        client_catalog = ClientCataloge.objects.get(user=user)
+        client_catalog_serializer = ClientCatalogeSerializer(
+            client_catalog, context={'request': request})
+
+        client_business = ClientBusiness.objects.get(user=user)
+        client_business_serializer = ClientBusinessSerializer(client_business)
+
+        response_data = {
+            'user': user_serializer.data,
+            'address': client_address_serializer.data,
+            'catalog': client_catalog_serializer.data,
+            'business': client_business_serializer.data
+        }
+
+        return Response(response_data)
 
 
 class ManageClientView(RetrieveUpdateDestroyAPIView):

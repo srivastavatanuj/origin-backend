@@ -91,13 +91,12 @@ class OrderListView(generics.ListAPIView):
         return Order.objects.filter(user=self.request.user)
 
 
-class OrderDetailView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = OrderDetailSerializer
-    lookup_field = 'id'
-
-    def get_queryset(self):
-        return Order.objects.filter(user=self.request.user)
+class OrderDetailView(views.APIView):
+    def get(self, request, id):
+        orders = Order.objects.filter(user=self.request.user)
+        serializer = OrderDetailSerializer(
+            orders, many=True, context={'request': request})
+        return Response(serializer.data)
 
 
 class CreatePaymentLinkView(views.APIView):
@@ -159,7 +158,7 @@ class CreatePaymentLinkView(views.APIView):
         if response.status_code == 200:
             payment_data = response.json()
             payment_url = payment_data['payment_link']['url']
-            order_id = payment_data['orders']['id']
+            # order_id = payment_data['orders']['id']
             return Response({
                 'details': 'Order created successfully',
                 'payment_url': payment_url,

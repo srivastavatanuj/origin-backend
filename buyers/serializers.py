@@ -74,6 +74,8 @@ class ClientBusinessSerializer(serializers.ModelSerializer):
 
 
 class ClientCatalogeSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = ClientCataloge
         fields = '__all__'
@@ -84,6 +86,12 @@ class ClientCatalogeSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and not request.user.is_superuser:
             self.fields.pop('user')
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return None
 
 
 class ClientAddressSerializer(serializers.ModelSerializer):
