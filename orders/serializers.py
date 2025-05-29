@@ -1,7 +1,7 @@
 from gettext import Catalog
 from rest_framework import serializers
 from .models import Cart, Order, OrderItem, Shipping, Payment
-from products.models import ProductCatalog, ProductImage
+from products.models import ProductCatalog, ProductImage, ProductVariant
 from buyers.models import ClientAddress
 from products.serializers import ProductVariantSerializer, ProductImageSerializer
 
@@ -12,14 +12,18 @@ class CartListSerializer(serializers.ModelSerializer):
         source='productVariant.product.name', read_only=True)
     product_image = serializers.CharField(
         source='productVariant.product.image', read_only=True)
-    variant_size = serializers.CharField(
-        source='productVariant.size', read_only=True)
+    weight = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
         fields = '__all__'
         read_only_fields = ('user',)
+
+    def get_weight(self, obj):
+        product_variant = obj.productVariant
+        weight = str(product_variant.weight)+product_variant.weight_unit
+        return weight
 
     def get_image(self, obj):
         # import pdb
@@ -54,9 +58,13 @@ class OrderItemSerializer(serializers.ModelSerializer):
         source='variant.product.name', read_only=True)
     product_image = serializers.CharField(
         source='variant.product.image', read_only=True)
-    variant_size = serializers.CharField(
-        source='variant.size', read_only=True)
+    weight = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+
+    def get_weight(self, obj):
+        product_variant = obj.variant
+        weight = str(product_variant.weight)+product_variant.weight_unit
+        return weight
 
     def get_image(self, obj):
         # import pdb
