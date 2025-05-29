@@ -36,9 +36,9 @@ class ProductAdmin(admin.ModelAdmin):
 
 class ProductVariantAdmin(admin.ModelAdmin):
     list_display = ('product__sku', 'product__name',
-                    'size', 'weight_with_unit', 'dimension', 'stock_inventory')
-    search_fields = ('product__name', 'product__sku', 'size')
-    ordering = ('product', 'size')
+                    'weight_with_unit', 'dimension', 'stock_inventory')
+    search_fields = ('product__name', 'product__sku',)
+    ordering = ('product',)
 
     def weight_with_unit(self, obj):
         return f"{obj.weight} {obj.weight_unit}"
