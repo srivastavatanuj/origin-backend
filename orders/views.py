@@ -121,7 +121,8 @@ class OrderListView(generics.ListAPIView):
 
 class OrderDetailView(views.APIView):
     def get(self, request, id):
-        orders = Order.objects.filter(user=self.request.user)
+
+        orders = Order.objects.filter(id=id)
         serializer = OrderDetailSerializer(
             orders, many=True, context={"request": request}
         )
@@ -138,17 +139,18 @@ class CreatePaymentLinkView(views.APIView):
 
         if not cart.exists():
             return Response(
-                {"details": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST
+                {"details": "Cart is empty"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        total_price = cart.aggregate(total=Sum("price"))["total"]
+        total_price = cart.aggregate(total=Sum("price"))["total"] or 0
         order = Order.objects.create(user=user, total_amount=total_price)
 
         try:
             for item in cart:
                 OrderItem.objects.create(
                     order=order,
-                    variant=item.productVariant,
+                    product=item.product,
                     quantity=item.quantity,
                     price=item.price,
                 )
@@ -165,19 +167,20 @@ class CreatePaymentLinkView(views.APIView):
             "Authorization": f"Bearer {os.getenv('SQUAREUP_TEST_TOKEN')}",
             "Content-Type": "application/json",
         }
+
         payload = {
             "idempotency_key": str(uuid.uuid4()),
-            "checkout_options": {
-                "redirect_url": "http://localhost:5173/orders/place",
-            },
             "order": {
-                "location_id": "LMX2N2PEESXYM",  # replace with your actual location ID
+                "location_id": "LMX2N2PEESXYM",  # replace with actual location ID
                 "line_items": [
                     {
-                        "name": f"{item.productVariant}",
+                        "name": (
+                            str(item.product)
+                            if hasattr(item, "product")
+                            else str(item.product.name)
+                        ),
                         "quantity": str(item.quantity),
                         "base_price_money": {
-                            # Square uses cents
                             "amount": int(item.price / item.quantity * 100),
                             "currency": "CAD",
                         },
@@ -185,28 +188,38 @@ class CreatePaymentLinkView(views.APIView):
                     for item in cart
                 ],
             },
+            "checkout_options": {
+                "redirect_url": os.getenv("PAYMENT_GATEWAY_REDIRECT_URL"),
+            },
         }
 
         response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            payment_data = response.json()
-            payment_url = payment_data["payment_link"]["url"]
-            payment_id = payment_data["payment_link"]["order_id"]
-            created_at = payment_data["payment_link"]["order_id"]
-            amount = (
-                payment_data["related_resources"]["orders"][0]["net_amounts"][
-                    "total_money"
-                ]["amount"]
-                / 100
-            )
+        data = response.json()
+
+        if response.status_code in [200, 201]:
+            payment_link = data.get("payment_link")
+            if not payment_link:
+                return Response(
+                    {"details": "Missing payment link data", "response": data},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            payment_url = payment_link.get("url")
+            payment_id = payment_link.get("id")
+            created_at = payment_link.get("created_at")
+            amount = total_price  # use your local calculated total
 
             Payment.objects.create(
                 payment_id=payment_id,
                 amount=amount,
                 payment_method="SquareUp",
                 created_at=created_at,
-                order_id=order.id,
+                order_id=order,
+                payment_status="PENDING",
             )
+
+            # Optional: Clear cart after creating order
+            cart.delete()
 
             return Response(
                 {
@@ -215,11 +228,13 @@ class CreatePaymentLinkView(views.APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
+
         else:
+            order.delete()  # cleanup failed order
             return Response(
                 {
                     "details": "Order created but failed to generate payment link",
-                    "square_response": response.json(),
+                    "square_response": data,
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -232,15 +247,23 @@ def square_webhook(request):
 
     if event_type == "payment.updated":
         payment = payload["data"]["object"]["payment"]
-        status = payment["status"]
-        payment_id = payment["id"]
+        status_str = payment.get("status")
+        payment_id = payment.get("id")
 
-        if status == "COMPLETED":
-            # Find your order using metadata or tracking ID, mark it as paid
-            pass
+        if status_str == "COMPLETED":
+            try:
+                pay = Payment.objects.get(payment_id=payment_id)
+                pay.status = "COMPLETED"
+                pay.save()
 
-    return Response({"status": "ok"})
-    # return Response({'details': 'success'}, status=status.HTTP_200_OK)
+                order = pay.order
+                order.status = "PAID"
+                order.save()
+
+            except Payment.DoesNotExist:
+                pass
+
+    return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
 
 class OrderManageView(generics.UpdateAPIView):

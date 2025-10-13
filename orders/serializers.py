@@ -41,40 +41,23 @@ class CartSerializer(serializers.ModelSerializer):
         exclude = ("price",)
         read_only_fields = ("user",)
 
-    def validate(self, data):
-        user = self.context["request"].user
-        catalog = ProductCatalog.objects.filter(catalog__user=user)
-        variantIds = catalog.values_list("product", flat=True)
-        if data["product"].id in variantIds:
-            data["price"] = (
-                data["quantity"] * catalog.get(product=data["product"].id).price
-            )
-            return data
-        raise serializers.ValidationError(
-            "Selected variant does not belong to the selected product"
-        )
+    # def validate(self, data):
+    #     user = self.context["request"].user
+    #     catalog = ProductCatalog.objects.filter(catalog__user=user)
+    #     variantIds = catalog.values_list("product", flat=True)
+    #     if data["product"].id in variantIds:
+    #         data["price"] = (
+    #             data["quantity"] * catalog.get(product=data["product"].id).price
+    #         )
+    #         return data
+    #     raise serializers.ValidationError(
+    #         "Selected variant does not belong to the selected product"
+    #     )
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="variant.product.name", read_only=True)
-    product_image = serializers.CharField(
-        source="variant.product.image", read_only=True
-    )
-    weight = serializers.SerializerMethodField()
-    image = serializers.SerializerMethodField()
-
-    def get_weight(self, obj):
-        product_variant = obj.variant
-        weight = str(product_variant.weight) + product_variant.weight_unit
-        return weight
-
-    def get_image(self, obj):
-        # import pdb
-        # pdb.set_trace()
-        image = ProductImage.objects.filter(product=obj.variant.product)[0]
-        return ProductImageSerializer(
-            image, context={"request": self.context["request"]}
-        ).data["image"]
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_image = serializers.CharField(source="product.image", read_only=True)
 
     class Meta:
         model = OrderItem
@@ -82,25 +65,25 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    name_field = serializers.SerializerMethodField()
+    # name_field = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         exclude = ("user",)
 
-    def get_name_field(self, obj):
+    # def get_name_field(self, obj):
 
-        items = OrderItem.objects.filter(order=obj).values_list(
-            "variant__product__name", flat=True
-        )
-        item_names = list(items)
+    #     items = OrderItem.objects.filter(order=obj).values_list(
+    #         "variant__product__name", flat=True
+    #     )
+    #     item_names = list(items)
 
-        if len(item_names) > 2:
-            truncated_names = item_names[:2]
-            truncated_names.append("...")
-            return ", ".join(truncated_names)
-        else:
-            return ", ".join(item_names)
+    #     if len(item_names) > 2:
+    #         truncated_names = item_names[:2]
+    #         truncated_names.append("...")
+    #         return ", ".join(truncated_names)
+    #     else:
+    #         return ", ".join(item_names)
 
 
 class OrderShippingSerializer(serializers.ModelSerializer):
@@ -118,7 +101,7 @@ class OrderPaymentSerializer(serializers.ModelSerializer):
 class OrderDetailSerializer(serializers.ModelSerializer):
     order_items = serializers.SerializerMethodField()
     shipping_details = serializers.SerializerMethodField()
-    # shipping_address = serializers.SerializerMethodField()
+    shipping_address = serializers.SerializerMethodField()
     payment_details = serializers.SerializerMethodField()
 
     class Meta:
@@ -126,24 +109,24 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def get_order_items(self, obj):
-        items = OrderItem.objects.filter(order=obj)
+        items = OrderItem.objects.filter(order_id=obj)
         serializer_items = OrderItemSerializer(
             items, many=True, context=self.context
         ).data
         return serializer_items
 
     def get_shipping_details(self, obj):
-        shipping = Shipping.objects.filter(order=obj)
+        shipping = Shipping.objects.filter(order_id=obj)
         serializer_items = OrderShippingSerializer(shipping, many=True).data
         return serializer_items
 
-    # def get_shipping_address(self, obj):
-    #     shipping = Shipping.objects.filter(order=obj)
-    #     serializer_items = OrderShippingSerializer(shipping, many=True).data
-    #     return serializer_items
+    def get_shipping_address(self, obj):
+        shipping = Shipping.objects.filter(order_id=obj)
+        serializer_items = OrderShippingSerializer(shipping, many=True).data
+        return serializer_items
 
     def get_payment_details(self, obj):
-        payment = Payment.objects.filter(order=obj)
+        payment = Payment.objects.filter(order_id=obj)
         serializer_items = OrderPaymentSerializer(
             payment, many=True, context={"request": self.context.get("request")}
         ).data

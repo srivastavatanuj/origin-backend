@@ -40,7 +40,7 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return f"{self.quantity} x {self.variant} in Order #{self.order.id}"
+        return f"{self.quantity} x {self.product} in Order #{self.order.id}"
 
 
 class Payment(models.Model):
