@@ -1,15 +1,24 @@
 from gettext import Catalog
 from rest_framework import generics, views
 from rest_framework.permissions import IsAdminUser, AllowAny, IsAuthenticated
-from .models import Brand, Category, Product, ProductVariant, ProductImage, ProductCatalog
+from .models import Brand, Category, Product, ProductImage, ProductCatalog
+from buyers.models import ClientCataloge
 from .serializers import (
-    BrandSerializer, CategorySerializer, ProductSerializer,
-    ProductVariantSerializer, ProductImageSerializer, ProductCatalogeSerializer, ViewProductSerializer, MyCatalogeProductVarientSerializer, MyCatalogeProductSerializer, MyCatalogeSerializer
+    BrandSerializer,
+    CategorySerializer,
+    ProductSerializer,
+    ProductImageSerializer,
+    ProductCatalogeSerializer,
+    ViewProductSerializer,
+    MyCatalogeProductVarientSerializer,
+    MyCatalogeProductSerializer,
+    MyCatalogeSerializer,
 )
 from buyers.permissions import IsAdminOrManager
 from faker import Faker
 import random
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 from django.core.files.base import ContentFile
 from django.core.files.images import ImageFile
@@ -25,8 +34,9 @@ from rest_framework.pagination import PageNumberPagination
 
 class CustomPagination(PageNumberPagination):
     page_size = 8
-    page_size_query_param = 'page_size'
+    page_size_query_param = "page_size"
     max_page_size = 100
+
 
 # BRAND
 
@@ -40,8 +50,9 @@ class ListProductBrandView(generics.ListCreateAPIView):
 class ManageProductBrandView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
-    lookup_field = 'id'
+    lookup_field = "id"
     permission_classes = [IsAdminOrManager]
+
 
 # CATEGORY
 
@@ -55,8 +66,9 @@ class ListProductCategoryView(generics.ListCreateAPIView):
 class ManageProductCategoryView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    lookup_field = 'id'
+    lookup_field = "id"
     permission_classes = [IsAdminOrManager]
+
 
 # PRODUCT
 
@@ -83,17 +95,18 @@ class ViewAllProductView(generics.ListAPIView):
 # VARIANT
 
 
-class ListProductVariantView(generics.ListCreateAPIView):
-    queryset = ProductVariant.objects.all()
-    serializer_class = ProductVariantSerializer
-    permission_classes = [IsAdminOrManager]
+# class ListProductVariantView(generics.ListCreateAPIView):
+#     queryset = ProductVariant.objects.all()
+#     serializer_class = ProductVariantSerializer
+#     permission_classes = [IsAdminOrManager]
 
 
-class ManageProductVariantView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ProductVariant.objects.all()
-    serializer_class = ProductVariantSerializer
-    lookup_field = 'id'
-    permission_classes = [IsAdminOrManager]
+# class ManageProductVariantView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = ProductVariant.objects.all()
+#     serializer_class = ProductVariantSerializer
+#     lookup_field = "id"
+#     permission_classes = [IsAdminOrManager]
+
 
 # IMAGE
 
@@ -107,8 +120,9 @@ class ListProductImageView(generics.ListCreateAPIView):
 class ManageProductImageView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
-    lookup_field = 'id'
+    lookup_field = "id"
     permission_classes = [IsAdminOrManager]
+
 
 # CATALOGE
 
@@ -122,7 +136,7 @@ class ListProductCatalogeView(generics.ListCreateAPIView):
 class ManageProductCatalogeView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductCatalog.objects.all()
     serializer_class = ProductCatalogeSerializer
-    lookup_field = 'id'
+    lookup_field = "id"
     permission_classes = [IsAdminOrManager]
 
 
@@ -132,47 +146,56 @@ class MyCatalogeView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return ProductCatalog.objects.filter(catalog__user=user)
+        userCataloge = ClientCataloge.objects.get(user=user)
+        if userCataloge.default_cataloge:
+            return ProductCatalog.objects.filter(catalog_id=1)
+        else:
+            return ProductCatalog.objects.filter(catalog__user=user)
 
 
-class MyCatalogeProductView(views.APIView):
+class MyCatalogeProductView(generics.RetrieveAPIView):
     serializer_class = ViewProductSerializer
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk):
-        user = request.user
-        catalog_entries = ProductCatalog.objects.filter(
-            catalog__user=user, product__pk=pk)
+    def get_queryset(self):
+        user = self.request.user
+        user_catalog = ClientCataloge.objects.get(user=user)
 
-        product = get_object_or_404(Product, pk=pk)
-
-        variant_ids = catalog_entries.values_list('product_variant', flat=True)
-        product_ids = catalog_entries.values_list('product', flat=True)
-        variants = ProductVariant.objects.filter(id__in=variant_ids)
-
-        product_data = ProductSerializer(
-            product, context={'request': request}).data
-        variant_data = ProductVariantSerializer(variants, many=True).data
-
-        catalog_entries_map = {
-            entry.product_variant.id: entry.price for entry in catalog_entries}
-
-        if catalog_entries[0].catalog.pricing_enabled:
-            for variant in variant_data:
-                var_id = variant['id']
-                if var_id in catalog_entries_map:
-                    variant['price'] = str(catalog_entries_map[var_id])
-
-        if pk in product_ids:
-            return Response({
-                "product": product_data,
-                "variants": variant_data
-            })
+        # Choose which catalog to filter
+        if user_catalog.default_cataloge:
+            return ProductCatalog.objects.filter(catalog_id=1)
         else:
-            return Response(
-                {"error": "Product not found in the user's catalog."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return ProductCatalog.objects.filter(catalog__user=user)
+
+    def retrieve(self, request, *args, **kwargs):
+        user = request.user
+        sku = self.kwargs.get("pk")
+
+        # Get user catalog
+        user_catalog = ClientCataloge.objects.get(user=user)
+        if user_catalog.default_cataloge:
+            catalog_products = ProductCatalog.objects.filter(catalog_id=1)
+        else:
+            catalog_products = ProductCatalog.objects.filter(catalog__user=user)
+
+        # Fetch product by SKU
+        product = get_object_or_404(Product, sku=sku)
+
+        # Check if product exists in catalog
+        catalog_entry = catalog_products.filter(product__sku=sku).first()
+
+        # Serialize product
+        product_data = self.get_serializer(product, context={"request": request}).data
+
+        print(product_data["price"], catalog_entry.price)
+
+        # Apply catalog price if available, else use default
+        if user_catalog.pricing_enabled:
+            product_data["price"] = str(catalog_entry.price)
+        else:
+            product_data["price"] = str(getattr(product, "price", 0))
+
+        return Response({"product": product_data})
 
 
 class MyCatalogeProductVarientView(generics.RetrieveAPIView):
@@ -187,22 +210,24 @@ def fake_brand():
     fake = Faker()
     for _ in range(5):
         Brand.objects.create(
-            name=fake.name(), logo=get_random_image(), country_of_origin=fake.country())
+            name=fake.name(), logo=get_random_image(), country_of_origin=fake.country()
+        )
 
 
 def fake_category():
     fake = Faker()
     for _ in range(5):
         Category.objects.create(
-            name=fake.name(), description=fake.text(), logo=get_random_image())
+            name=fake.name(), description=fake.text(), logo=get_random_image()
+        )
 
 
 def get_random_image():
     fake = Faker()
     # generate a random image in memory
-    image = Image.new('RGB', (100, 100), color=fake.color())
+    image = Image.new("RGB", (100, 100), color=fake.color())
     buffer = io.BytesIO()
-    image.save(buffer, format='PNG')
+    image.save(buffer, format="PNG")
     return ContentFile(buffer.getvalue(), name=f"{fake.word()}.png")
 
 
@@ -214,35 +239,32 @@ def fake_product():
     for _ in range(20):  # number of products
         brand = random.choice(brands)
         product = Product.objects.create(
-            sku=fake.unique.bothify(text='???-#####'),
+            sku=fake.unique.bothify(text="???-#####"),
             name=fake.word().capitalize(),
             description=fake.text(),
-            status=random.choice(['active', 'inactive', 'discontinued']),
+            status=random.choice(["active", "inactive", "discontinued"]),
             barcode=fake.ean13(),
             supplier_note=fake.text(),
-            brand=brand
+            brand=brand,
         )
-        product.category.set(random.sample(
-            list(categories), k=random.randint(1, 3)))
+        product.category.set(random.sample(list(categories), k=random.randint(1, 3)))
 
         # Images
         for _ in range(random.randint(1, 3)):
             ProductImage.objects.create(
-                product=product,
-                image=get_random_image(),
-                alt_text=fake.sentence()
+                product=product, image=get_random_image(), alt_text=fake.sentence()
             )
 
         # Variants
-        for _ in range(random.randint(1, 4)):
-            ProductVariant.objects.create(
-                product=product,
-                size=round(random.uniform(100, 500), 2),
-                size_unit=random.choice(['g', 'kg', 'ml', 'L']),
-                price=round(random.uniform(10, 100), 2),
-                packer_length=random.uniform(5, 20),
-                packer_width=random.uniform(5, 20),
-                packer_height=random.uniform(5, 20),
-                stock_inventory=random.randint(1, 100),
-                expiry=fake.future_date()
-            )
+        # for _ in range(random.randint(1, 4)):
+        #     ProductVariant.objects.create(
+        #         product=product,
+        #         size=round(random.uniform(100, 500), 2),
+        #         size_unit=random.choice(["g", "kg", "ml", "L"]),
+        #         price=round(random.uniform(10, 100), 2),
+        #         packer_length=random.uniform(5, 20),
+        #         packer_width=random.uniform(5, 20),
+        #         packer_height=random.uniform(5, 20),
+        #         stock_inventory=random.randint(1, 100),
+        #         expiry=fake.future_date(),
+        #     )

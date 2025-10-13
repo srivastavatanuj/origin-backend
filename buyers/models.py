@@ -16,8 +16,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['full_name', 'phone']
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["full_name", "phone"]
 
     objects = CustomAuthManager()
 
@@ -28,10 +28,15 @@ class User(AbstractBaseUser, PermissionsMixin):
 class ClientBusiness(models.Model):
 
     user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name='client_profile', limit_choices_to={"is_staff": False})
+        User,
+        on_delete=models.CASCADE,
+        related_name="client_profile",
+        limit_choices_to={"is_staff": False},
+    )
     business_name = models.CharField(max_length=255)
     logo = models.ImageField(
-        upload_to='buyers/images/cafe_logos/', null=True, blank=True)
+        upload_to="buyers/images/cafe_logos/", null=True, blank=True
+    )
     account_number = models.CharField(max_length=50, unique=True)
     business_email = models.EmailField()
     business_phone = models.CharField(max_length=15)
@@ -42,8 +47,8 @@ class ClientBusiness(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'is_staff': True, 'is_superuser': False},
-        related_name='clients_handled'
+        limit_choices_to={"is_staff": True, "is_superuser": False},
+        related_name="clients_handled",
     )
 
     account_notes = models.TextField(blank=True, null=True)
@@ -54,12 +59,15 @@ class ClientBusiness(models.Model):
 
 class StaffProfile(models.Model):
     ROLE_CHOICES = [
-        ('manager', 'Manager'),
-        ('sales_rep', 'Sales Representative'),
+        ("manager", "Manager"),
+        ("sales_rep", "Sales Representative"),
     ]
 
     user = models.OneToOneField(
-        User, on_delete=models.CASCADE, limit_choices_to={'is_staff': True, 'is_superuser': False})
+        User,
+        on_delete=models.CASCADE,
+        limit_choices_to={"is_staff": True, "is_superuser": False},
+    )
     role = models.CharField(max_length=50, choices=ROLE_CHOICES)
 
     def __str__(self):
@@ -68,20 +76,24 @@ class StaffProfile(models.Model):
 
 class ClientCataloge(models.Model):
     ORDER_FREQUENCY_CHOICES = [
-        ('daily', 'Daily'),
-        ('weekly', 'Weekly'),
-        ('biweekly', 'Every 15 Days'),
+        ("daily", "Daily"),
+        ("weekly", "Weekly"),
+        ("biweekly", "Every 15 Days"),
     ]
     user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name='client_catalog', limit_choices_to={"is_staff": False})
+        User,
+        on_delete=models.CASCADE,
+        related_name="client_catalog",
+        limit_choices_to={"is_staff": False},
+    )
     image = models.ImageField(
-        upload_to='buyers/images/client_images/', null=True, blank=True)
+        upload_to="buyers/images/client_images/", null=True, blank=True
+    )
     order_frequency = models.CharField(
-        max_length=20,
-        choices=ORDER_FREQUENCY_CHOICES,
-        default='weekly'
+        max_length=20, choices=ORDER_FREQUENCY_CHOICES, default="weekly"
     )
     pricing_enabled = models.BooleanField(default=False)
+    default_cataloge = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.user.email}'s Client Catalog"
@@ -89,7 +101,11 @@ class ClientCataloge(models.Model):
 
 class ClientAddress(models.Model):
     user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name='client_address', limit_choices_to={"is_staff": False})
+        User,
+        on_delete=models.CASCADE,
+        related_name="client_address",
+        limit_choices_to={"is_staff": False},
+    )
     billing_address1 = models.TextField()
     billing_address2 = models.TextField(blank=True, null=True)
     billing_city = models.CharField(max_length=100)

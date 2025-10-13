@@ -4,6 +4,9 @@ from .models import User, ClientBusiness, StaffProfile, ClientCataloge, ClientAd
 from django.utils.crypto import get_random_string
 from django.urls import reverse
 from django.http import HttpResponseRedirect
+from django.core.mail import send_mail
+from django.conf import settings
+
 
 
 class UserChangeForm(forms.ModelForm):
@@ -37,10 +40,24 @@ class UserAdmin(admin.ModelAdmin):
             password = get_random_string(length=10)
             obj.set_password(password)
             obj.save()
-            messages.success(
-                request, f"User created successfully. Password is: {password}")
+
+            subject = 'Origins Coffee Account Created'
+            message = f"Hello {obj.full_name},\n\nYour account has been created.\nYour password is: {password}\n\nPlease change your password after logging in."
+            recipient_list = [obj.email]
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.EMAIL_HOST_USER,
+                    recipient_list,
+                    fail_silently=False,
+                )
+                messages.success(request, f"User created successfully. Password sent to {obj.email}")
+            except Exception as e:
+                messages.error(request, f"User created, but failed to send email: {str(e)}")
         else:
             super().save_model(request, obj, form, change)
+
 
     def response_add(self, request, obj, post_url_continue=None):
         if not obj.is_staff:
