@@ -168,6 +168,10 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1/",
 ]
 
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
