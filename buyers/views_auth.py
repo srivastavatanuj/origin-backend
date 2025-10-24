@@ -7,6 +7,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import send_mail
 from django.conf import settings
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from .permissions import IsAdminOrManager
 
@@ -92,7 +96,9 @@ class ResetView(APIView):
             user.hash = resetHash
             user.timestamp = timestamp
             user.save()
-            reset_link = request.build_absolute_uri() + f"{resetHash}/"
+
+            BASE_URL = os.getenv("FRONTEND_BASE_URL")
+            reset_link = BASE_URL + "/reset/" + f"{resetHash}/"
 
             subject = "Origins Coffee Password Reset"
             message = f"Hello {user.full_name},\n\nYour reset link is: {reset_link}\n\n"

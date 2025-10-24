@@ -167,11 +167,14 @@ class CreatePaymentLinkView(views.APIView):
             "Authorization": f"Bearer {os.getenv('SQUAREUP_TEST_TOKEN')}",
             "Content-Type": "application/json",
         }
+        print(f"Bearer {os.getenv('SQUAREUP_TEST_TOKEN')}", url)
 
         payload = {
             "idempotency_key": str(uuid.uuid4()),
             "order": {
-                "location_id": "LMX2N2PEESXYM",  # replace with actual location ID
+                "location_id": os.getenv(
+                    "LOCATION_ID"
+                ),  # replace with actual location ID
                 "line_items": [
                     {
                         "name": (
@@ -189,7 +192,8 @@ class CreatePaymentLinkView(views.APIView):
                 ],
             },
             "checkout_options": {
-                "redirect_url": os.getenv("PAYMENT_GATEWAY_REDIRECT_URL"),
+                "redirect_url": os.getenv("PAYMENT_GATEWAY_REDIRECT_URL")
+                + str(order.id),
             },
         }
 
